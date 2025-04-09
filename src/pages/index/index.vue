@@ -54,12 +54,12 @@ export default {
             scrollIntoViewId.value = "scroll-anchor";
           }, 0);
         }
-        c++
         if (c >= content.length) {
           isFinish.value = true
           return
         }
         mdText.value = mdText.value + content[c];
+        c++
       }, 10);
       inputText.value = "请输入";
     }
