@@ -1,6 +1,7 @@
+//markdown语法特殊字符
 const mkSyntaxChars = [
-  "\n",
   "#",
+  "*",
   "*",
   "_",
   "`",
@@ -101,14 +102,14 @@ Component({
         if (!_this.data.mdText || c >= _this.data.mdText.length) {
           return
         }
-        c++;
         const singleChar = _this.data.mdText[c];
+        c++;
         if (singleChar == undefined) {
           return
         }
         typerText = typerText + singleChar;
         allText = allText + singleChar;
-        if (mkSyntaxChars.includes(singleChar)) {
+        if (mkSyntaxChars.includes(singleChar) || singleChar.match( /\r?\n/g)) {
           curShowText = "";
         } else {
           curShowText = curShowText + singleChar;
@@ -127,17 +128,21 @@ Component({
             } else {
               for (let i = 0; i < objTree.children.length; i++) {
                 _this.dataNodes[oldFirstLevelChildNodes.length + i] = objTree.children[i]
+                //通过路径的方式，一个个元素地渲染，比直接_this.setData(dataNodes,数组)的方式，效率提高很多
                 _this.setData({ [`dataNodes[${oldFirstLevelChildNodes.length + i}]`]: objTree.children[i] });
               }
+              //上一次可能渲染了多余的节点，这次要去掉
               for (let x = oldFirstLevelChildNodes.length + objTree.children.length; x < _this.dataNodes.length; x++) {
                 _this.setData({ [`dataNodes[${x}]`]: { tag: "unknow" } });
               }
             }
-
-            const curNewNodesNum = towxml(
+            //以下是判断是否可以复用的逻辑，复用的条件就是：当最新的内容转化出来有n个节点，那么只有第n个是可能不完整的，前n-1个是可以复用的
+            //allText.substring(finishIndex, allText.length - 1)截至是 allText.length - 1而不是allText.length，是为了避免1. 2.这种有序列表情况触发的问题，因为1，2不是markdown特殊语法字符，但是1. 却是
+            const curNewNodes = towxml(
               allText.substring(finishIndex, allText.length - 1),
               "markdown"
-            ).children.length;
+            )
+            const curNewNodesNum = Math.min(curNewNodes.children.length, objTree.children.length);
             if (curNewNodesNum >= 2) {
               for (let i = 0; i < curNewNodesNum - 1; i++) {
                 oldFirstLevelChildNodes.push(objTree.children[i])
@@ -148,7 +153,8 @@ Component({
                   allText.substring(finishIndex, j),
                   "markdown"
                 );
-                if (tmpNodes.children.length <= curNewNodesNum - 1) {
+                //allText[j - 1].match( /\r?\n/g) 这句话也是为了避免1. 2.这种有序列表情况触发的问题
+                if (tmpNodes.children.length <= curNewNodesNum - 1 && allText[j - 1] && allText[j - 1].match( /\r?\n/g)) {
                   finishIndex = j;
                   break;
                 }
