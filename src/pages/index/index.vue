@@ -12,7 +12,7 @@
           <view class="answer-item">
             <towxml
               :mdText="mdText"
-              :speed="15"
+              :speed="400"
               :isFinish="isFinish"
               @finish="finish"
             />
@@ -47,8 +47,8 @@ export default {
     let timer = undefined;
     uni.request({
       // url: `http://110.41.9.23/static/video-embed.md`,
-      // url: `http://110.41.9.23/static/test1010.md`,
-      url: `https://zxx-wwj-oss.oss-cn-shenzhen.aliyuncs.com/schChoose/article/d338e6c9-dc59-45d1-8482-5ea21d05f449/923e9f20-46da-4026-844b-f6a2c14ec0eb.md`,
+      url: `http://110.41.9.23/static/test6060.md`,
+      // url: `https://zxx-wwj-oss.oss-cn-shenzhen.aliyuncs.com/schChoose/article/d338e6c9-dc59-45d1-8482-5ea21d05f449/923e9f20-46da-4026-844b-f6a2c14ec0eb.md`,
       // url: `https://zxx-wwj-oss.oss-cn-shenzhen.aliyuncs.com/schChoose/article/4d711758-074e-4be8-b280-77cc51719248/08c54e75-144f-426a-ba38-eb91cf464846.md`,
       encoding: "utf-8",
       success: (res) => {

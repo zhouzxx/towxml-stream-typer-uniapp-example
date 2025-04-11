@@ -26,7 +26,11 @@ const mkSyntaxChars = [
   " ",
 ];
 const towxml = require("./index");
-const { textRenderCb } = require("./typable-text/text-cb");
+const {
+  textRenderCb,
+  textInstaceUuid,
+  curText,
+} = require("./typable-text/text-cb");
 Component({
   options: {
     styleIsolation: "shared",
@@ -85,8 +89,10 @@ Component({
       let allText = "";
       let oldFirstLevelChildNodes = [];
       let timer = undefined;
-      let curShowText = "";
+      let testAfterMkSyntaxChar = "";
       let flag = false;
+      let tmpUuid = "";
+      let index = 0;
       timer = setInterval(() => {
         if (_this.data.isFinish && c >= _this.data.mdText.length) {
           //由于typable-text.js中这句话if (curShowText.length === tmpText.length && curShowText === tmpText) 的判断不一定精确，所以可能会导致最后一句文本打印不完全，所以在结束前，把下面的代码重复执行一遍，也是迫不得已
@@ -121,18 +127,20 @@ Component({
         typerText = typerText + singleChar;
         allText = allText + singleChar;
         if (_this.isMkSyntaxChar(lastSingleChar, singleChar)) {
-          curShowText = "";
+          testAfterMkSyntaxChar = "";
         } else {
-          curShowText = curShowText + singleChar;
-          if (curShowText.length == 1) {
+          testAfterMkSyntaxChar = testAfterMkSyntaxChar + singleChar;
+          if (testAfterMkSyntaxChar.length == 1) {
+            tmpUuid = textInstaceUuid.value;
             const objTree = towxml(allText.substring(finishIndex), "markdown");
-            // console.log("当前finishIndex: ", finishIndex)
-            // console.log("当前字符串：\n", allText.substring(finishIndex))
-            // console.log("当前对象数据：", objTree.children)
+            // console.log("当前finishIndex: ", finishIndex);
+            // console.log("当前字符串：\n", allText.substring(finishIndex));
+            // console.log("渲染对应的第一个字符：",singleChar)
+            // console.log("当前对象数据：", objTree.children);
             if (!flag) {
               flag = true;
               _this.dataNodes = objTree.children;
-              _this.setData("dataNodes", objTree.children);
+              _this.setData({ dataNodes: objTree.children });
             } else {
               for (let i = 0; i < objTree.children.length; i++) {
                 _this.dataNodes[oldFirstLevelChildNodes.length + i] =
@@ -171,8 +179,7 @@ Component({
               while (true) {
                 //allText[j - 1].match( /\r?\n/g) 这句话也是为了避免1. 2.这种有序列表情况触发的问题
                 //应该判断allText[j - 1] && allText[j - 1].match(/\r?\n/g) 和 tmpNodes.children.length <= curNewNodesNum - 1同时成立，拆成两个if,提高效率
-                if (allText[j - 1] &&
-                  allText[j - 1].match(/\r?\n/g)) {
+                if (allText[j - 1] && allText[j - 1].match(/\r?\n/g)) {
                   const tmpNodes = towxml(
                     allText.substring(finishIndex, j),
                     "markdown"
@@ -186,8 +193,22 @@ Component({
               }
             }
           } else {
+            // console.log("当前c和当前字符的值：", c, singleChar);
+            // console.log("tmpUuid的值", tmpUuid);
+            // console.log("textInstaceUuid.value的值", textInstaceUuid.value);
+            // console.log("curText.value:")
+            // console.log(curText.value)
+            // console.log("c - index - 1的值",c - index - 1)
+            // console.log("curText.value.length的值",curText.value.length)
             if (textRenderCb.value && singleChar) {
-              textRenderCb.value(singleChar, curShowText);
+              if (tmpUuid != textInstaceUuid.value) {
+                if(testAfterMkSyntaxChar.length == 2){
+                  index = c - 2;
+                }
+                textRenderCb.value(singleChar);
+              } else if (c - index - 1 === curText.value.length) {
+                textRenderCb.value(singleChar);
+              }
             }
           }
         }
@@ -205,16 +226,18 @@ Component({
       } //如果.号的前面不是数字,那一定不是有特殊含义的markdwon字符
       if (!/^\d$/.test(c1) && c2 == ".") {
         return false;
-      } //如果连续两个markdwon特殊字符的组合不是ar2中的一个，且第二个字符串不为" ",那第二个字符一定没有意义
+      } //如果连续两个markdwon特殊字符的组合不是ar2中的一个，且第二个字符串不为" "以及换行符,那第二个字符一定没有意义
       if (
         mkSyntaxChars.includes(c1) &&
         mkSyntaxChars.includes(c2) &&
         c2 != " " &&
+        !c1.match(/\r?\n/g) &&
+        !c2.match(/\r?\n/g) &&
         !ar2.includes(c1 + c2)
       ) {
         return false;
       }
-      return mkSyntaxChars.includes(c2);
+      return mkSyntaxChars.includes(c2) || c2.match(/\r?\n/g);
     },
   },
 });
