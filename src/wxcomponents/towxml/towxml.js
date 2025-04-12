@@ -1,8 +1,9 @@
 //markdown语法特殊字符
 const mkSyntaxChars = [
   "\n",
+  "\r",
+  "\r\n",
   "#",
-  "*",
   "*",
   "_",
   "`",
@@ -16,13 +17,13 @@ const mkSyntaxChars = [
   "+",
   ".",
   "-",
-  "\\",
   "^",
-  "~",
-  ":",
-  "=",
-  "$",
-  "&",
+  // "~",
+  // "\\",
+  // ":",
+  // "=",
+  // "$",
+  // "&",
   " ",
 ];
 const towxml = require("./index");
@@ -30,6 +31,7 @@ const {
   textRenderCb,
   textInstaceUuid,
   curText,
+  initTextCb,
 } = require("./typable-text/text-cb");
 Component({
   options: {
@@ -37,12 +39,12 @@ Component({
   },
   properties: {
     mdText: {
-      type: String,
-      value: "",
+      type: Object,
+      value: {},
     },
     speed: {
       type: Number,
-      value: 20,
+      value: 10,
     },
     isFinish: {
       type: Boolean,
@@ -60,17 +62,21 @@ Component({
   observers: {
     mdText: function (newVal) {
       if (!this.data.openTyper && newVal) {
-        this.setData({ dataNodes: towxml(newVal, "markdown").children });
+        this.setData({
+          dataNodes: towxml(this.data.mdText.text, "markdown").children,
+        });
       }
-      if (this.data.openTyper && newVal && !this.isStarted) {
-        this.isStarted = true;
-        this.startType();
-      }
+      // if (this.data.openTyper && newVal && !this.isStarted) {
+      //   this.isStarted = true;
+      //   this.startType();
+      // }
     },
   },
   lifetimes: {
     ready: function () {
-      if (this.data.openTyper && this.data.mdText && !this.isStarted) {
+      console.log("创建了towxml组件实例")
+      if (this.data.openTyper && !this.isStarted) {
+        initTextCb();
         this.isStarted = true;
         this.startType();
       }
@@ -93,11 +99,11 @@ Component({
       let flag = false;
       let tmpUuid = "";
       let index = 0;
+      let isNeedFlushIndex = false;
+      let lastCurText = "";
       timer = setInterval(() => {
-        if (_this.data.isFinish && c >= _this.data.mdText.length) {
-          //由于typable-text.js中这句话if (curShowText.length === tmpText.length && curShowText === tmpText) 的判断不一定精确，所以可能会导致最后一句文本打印不完全，所以在结束前，把下面的代码重复执行一遍，也是迫不得已
-          //核心原因就是，特殊字符后的文本不一定会创建新的文本组件实例，可能是作用在该特殊文本之前的文本组件实例，导致curShowText === tmpText为false，导致最后一句文本没有打印完全，而中间的文本会进行样式复位修复，所以不存在打印不完全的情况
-          //这个地方暂时没想到最优解，暂时先这样用着
+        if (_this.data.isFinish && c >= _this.data.mdText.text.length) {
+          //最后一段文本可能打印不完全，这里善后一下
           const objTree = towxml(allText.substring(finishIndex), "markdown");
           for (let i = 0; i < objTree.children.length; i++) {
             _this.dataNodes[oldFirstLevelChildNodes.length + i] =
@@ -108,6 +114,7 @@ Component({
                 objTree.children[i],
             });
           }
+          // console.log("看下全文的对象树", towxml(allText, "markdown"));
           this.triggerEvent("finish", {
             message: "打字完毕！",
           });
@@ -115,27 +122,78 @@ Component({
           clearInterval(timer);
           return;
         }
-        if (!_this.data.mdText || c >= _this.data.mdText.length) {
+        if (!_this.data.mdText.text || c >= _this.data.mdText.text.length) {
           return;
         }
-        const singleChar = _this.data.mdText[c];
-        const lastSingleChar = _this.data.mdText[c - 1];
+        const singleChar = _this.data.mdText.text[c];
+        const lastSingleChar = _this.data.mdText.text[c - 1];
         c++;
         if (singleChar == undefined) {
           return;
         }
         typerText = typerText + singleChar;
         allText = allText + singleChar;
+        //更新最新的文本组件实例对应的显示文本的第一个字符的位置
+        if (isNeedFlushIndex) {
+          if (tmpUuid != textInstaceUuid.value) {
+            index = c - 2;
+          }
+          //用来处理以下情况：
+          //<think>
+          //嗯
+          if (
+            tmpUuid == textInstaceUuid.value &&
+            c - index - 1 !== curText.value.length &&
+            curText.value === allText[c - 2] &&
+            lastCurText !== curText.value
+          ) {
+            index = c - 2;
+          }
+          isNeedFlushIndex = false;
+        }
+        //当碰到换行符的时候，渲染一下未复用的数据，这个if对应的bug的文本
+        //**comm**
+        // ```bash
+        // conda
+        // ```
+        if (singleChar.match(/\r?\n/g)) {
+          const objTree = towxml(allText.substring(finishIndex), "markdown");
+          if (!flag) {
+            flag = true;
+            _this.dataNodes = objTree.children;
+            _this.setData({ dataNodes: objTree.children });
+          } else {
+            for (let i = 0; i < objTree.children.length; i++) {
+              _this.dataNodes[oldFirstLevelChildNodes.length + i] =
+                objTree.children[i];
+              //通过路径的方式，一个个元素地渲染，比直接_this.setData(dataNodes,数组)的方式，效率提高很多
+              _this.setData({
+                [`dataNodes[${oldFirstLevelChildNodes.length + i}]`]:
+                  objTree.children[i],
+              });
+            }
+            //上一次可能渲染了多余的节点，这次要去掉
+            for (
+              let x = oldFirstLevelChildNodes.length + objTree.children.length;
+              x < _this.dataNodes.length;
+              x++
+            ) {
+              _this.setData({ [`dataNodes[${x}]`]: { tag: "unknow" } });
+            }
+          }
+        }
         if (_this.isMkSyntaxChar(lastSingleChar, singleChar)) {
           testAfterMkSyntaxChar = "";
         } else {
           testAfterMkSyntaxChar = testAfterMkSyntaxChar + singleChar;
           if (testAfterMkSyntaxChar.length == 1) {
+            isNeedFlushIndex = true;
             tmpUuid = textInstaceUuid.value;
+            lastCurText = curText.value;
             const objTree = towxml(allText.substring(finishIndex), "markdown");
             // console.log("当前finishIndex: ", finishIndex);
             // console.log("当前字符串：\n", allText.substring(finishIndex));
-            // console.log("渲染对应的第一个字符：",singleChar)
+            // console.log("渲染对应的第一个字符：", singleChar);
             // console.log("当前对象数据：", objTree.children);
             if (!flag) {
               flag = true;
@@ -167,17 +225,15 @@ Component({
               allText.substring(finishIndex, allText.length - 1),
               "markdown"
             );
+            // console.log("curNewNodes的值：", curNewNodes);
             const curNewNodesNum = Math.min(
               curNewNodes.children.length,
               objTree.children.length
             );
             if (curNewNodesNum >= 2) {
-              for (let i = 0; i < curNewNodesNum - 1; i++) {
-                oldFirstLevelChildNodes.push(objTree.children[i]);
-              }
-              let j = c;
+              let j = allText.length - 1;
               while (true) {
-                //allText[j - 1].match( /\r?\n/g) 这句话也是为了避免1. 2.这种有序列表情况触发的问题
+                //allText[j - 1].match( /\r?\n/g) 这句话也是为了避免1. 2.这种有序列表情况触发的问题,同时对复用加以限制，每次在换行处才可能可以复用，即：curNewNodesNum >= 2 时不一定就能复用成功，还得以换行为单位
                 //应该判断allText[j - 1] && allText[j - 1].match(/\r?\n/g) 和 tmpNodes.children.length <= curNewNodesNum - 1同时成立，拆成两个if,提高效率
                 if (allText[j - 1] && allText[j - 1].match(/\r?\n/g)) {
                   const tmpNodes = towxml(
@@ -185,6 +241,9 @@ Component({
                     "markdown"
                   );
                   if (tmpNodes.children.length <= curNewNodesNum - 1) {
+                    for (let i = 0; i < tmpNodes.children.length; i++) {
+                      oldFirstLevelChildNodes.push(objTree.children[i]);
+                    }
                     finishIndex = j;
                     break;
                   }
@@ -196,18 +255,35 @@ Component({
             // console.log("当前c和当前字符的值：", c, singleChar);
             // console.log("tmpUuid的值", tmpUuid);
             // console.log("textInstaceUuid.value的值", textInstaceUuid.value);
-            // console.log("curText.value:")
-            // console.log(curText.value)
-            // console.log("c - index - 1的值",c - index - 1)
-            // console.log("curText.value.length的值",curText.value.length)
+            // console.log("curText.value:");
+            // console.log(curText.value);
+            // console.log("c - index - 1的值", c - index - 1);
+            // console.log("curText.value.length的值", curText.value.length);
             if (textRenderCb.value && singleChar) {
+              //产生了新的文本实例，一段连续显示的文本中还没有碰到特殊markdown字符
               if (tmpUuid != textInstaceUuid.value) {
-                if(testAfterMkSyntaxChar.length == 2){
-                  index = c - 2;
+                textRenderCb.value(singleChar);
+                return
+              } else {
+                //没有产生新的文本实例，一段连续显示的文本中碰到了特殊markdown字符，但是这个特殊字符是正常显示
+                if (c - index - 1 === curText.value.length) {
+                  textRenderCb.value(singleChar);
+                  return
                 }
-                textRenderCb.value(singleChar);
-              } else if (c - index - 1 === curText.value.length) {
-                textRenderCb.value(singleChar);
+                //没有产生新的文本实例，一段连续显示的文本中碰到了特殊markdown字符，但是特殊字符不是正常显示，最后那个正常字符确正常显示
+                //<think>
+                //嗯
+                if (
+                  c - index - 1 !== curText.value.length &&
+                  curText.value === allText[c - 2] &&
+                  lastCurText !== curText.value
+                ) {
+                  textRenderCb.value(singleChar);
+                  return
+                }
+                //还有一种情况,不做处理：没有产生新的文本实例，一段连续显示的文本中碰到了特殊markdown字符，但是特殊字符不是正常显示，最后那个正常字符确不正常显示，如：
+                //# hello
+                //```python
               }
             }
           }
@@ -215,29 +291,44 @@ Component({
       }, _this.data.speed);
     },
     isMkSyntaxChar(c1, c2) {
-      const ar1 = [" ", "#", "+", ":", "("];
-      const ar2 = ["##", "**", "__", "--", "``", "~~", "# ", ". ", "  "];
+      const ar1 = [" ", "+", ":", "(", "-"];
+      // const ar2 = ["##", "**", "__", "--", "``", "~~", "# ", ". ", "  "];
       const ar3 = ["*", "_", "`", "~"]; //ar3中包含的markdwon字符是可能有意义的
+      const spaceLikeCodes = [160, 8203, 8204, 8205, 8239, 12288]; //长得像空格的特殊码值
+      // 不间断空格	160
+      // 零宽空格	8203
+      // 零宽不连字	8204
+      // 零宽连字	8205
+      // 窄空格	8239
+      // 全角空格	12288
+      if (spaceLikeCodes.includes(c2.charCodeAt(0))) {
+        return true;
+      }
       if (ar3.includes(c2)) {
         return true;
-      } //ar1中字符前面不是特殊的markdown字符，那一定不是有特殊含义的markdwon字符
+      }
+      // //ar1中字符前面不是特殊的markdown字符，那一定不是有特殊含义的markdwon字符
       if (ar1.includes(c2) && !mkSyntaxChars.includes(c1)) {
         return false;
-      } //如果.号的前面不是数字,那一定不是有特殊含义的markdwon字符
-      if (!/^\d$/.test(c1) && c2 == ".") {
-        return false;
-      } //如果连续两个markdwon特殊字符的组合不是ar2中的一个，且第二个字符串不为" "以及换行符,那第二个字符一定没有意义
-      if (
-        mkSyntaxChars.includes(c1) &&
-        mkSyntaxChars.includes(c2) &&
-        c2 != " " &&
-        !c1.match(/\r?\n/g) &&
-        !c2.match(/\r?\n/g) &&
-        !ar2.includes(c1 + c2)
-      ) {
+      }
+      // //如果.号的前面不是数字,那一定不是有特殊含义的markdwon字符
+      if (!/^\d$/.test(c1) && c2 === ".") {
         return false;
       }
-      return mkSyntaxChars.includes(c2) || c2.match(/\r?\n/g);
+      // //如果连续两个markdwon特殊字符的组合不是ar2中的一个，且第二个字符串不为" "以及换行符,那第二个字符一定没有意义
+      // if (
+      //   mkSyntaxChars.includes(c1) &&
+      //   mkSyntaxChars.includes(c2) &&
+      //   c2 != " " &&
+      //   !c1.match(/\r?\n/g) &&
+      //   !c2.match(/\r?\n/g) &&
+      //   !ar2.includes(c1 + c2)
+      // ) {
+      //   return false;
+      // }
+      return (
+        mkSyntaxChars.includes(c2) || c2.match(/\r?\n/g) || c2.match(/\t/g)
+      );
     },
   },
 });
