@@ -19,7 +19,7 @@ const mkSyntaxChars = [
   "-",
   "^",
   // "~",
-  // "\\",
+  "\\",
   // ":",
   // "=",
   // "$",
@@ -74,7 +74,7 @@ Component({
   },
   lifetimes: {
     ready: function () {
-      console.log("创建了towxml组件实例")
+      console.log("创建了towxml组件实例");
       if (this.data.openTyper && !this.isStarted) {
         initTextCb();
         this.isStarted = true;
@@ -263,12 +263,20 @@ Component({
               //产生了新的文本实例，一段连续显示的文本中还没有碰到特殊markdown字符
               if (tmpUuid != textInstaceUuid.value) {
                 textRenderCb.value(singleChar);
-                return
+                return;
               } else {
                 //没有产生新的文本实例，一段连续显示的文本中碰到了特殊markdown字符，但是这个特殊字符是正常显示
                 if (c - index - 1 === curText.value.length) {
                   textRenderCb.value(singleChar);
-                  return
+                  return;
+                }
+                //markdown字符串中转义的情况
+                if (
+                  _this.unescapeMarkdown(allText.substring(index, c - 1))
+                    .length === curText.value.length
+                ) {
+                  textRenderCb.value(singleChar);
+                  return;
                 }
                 //没有产生新的文本实例，一段连续显示的文本中碰到了特殊markdown字符，但是特殊字符不是正常显示，最后那个正常字符确正常显示
                 //<think>
@@ -279,7 +287,7 @@ Component({
                   lastCurText !== curText.value
                 ) {
                   textRenderCb.value(singleChar);
-                  return
+                  return;
                 }
                 //还有一种情况,不做处理：没有产生新的文本实例，一段连续显示的文本中碰到了特殊markdown字符，但是特殊字符不是正常显示，最后那个正常字符确不正常显示，如：
                 //# hello
@@ -329,6 +337,29 @@ Component({
       return (
         mkSyntaxChars.includes(c2) || c2.match(/\r?\n/g) || c2.match(/\t/g)
       );
+    },
+    unescapeMarkdown(text) {
+      // 定义常见的 Markdown 转义字符及其对应的原始字符
+      const escapeChars = {
+        "\\*": "*",
+        "\\_": "_",
+        "\\#": "#",
+        "\\+": "+",
+        "\\-": "-",
+        "\\.": ".",
+        "\\`": "`",
+        "\\[": "[",
+        "\\]": "]",
+        "\\(": "(",
+        "\\)": ")",
+        "\\!": "!",
+        "\\>": ">",
+      };
+      let unescapedText = text;
+      for (const [escaped, original] of Object.entries(escapeChars)) {
+        unescapedText = unescapedText.replaceAll(escaped, original);
+      }
+      return unescapedText;
     },
   },
 });
