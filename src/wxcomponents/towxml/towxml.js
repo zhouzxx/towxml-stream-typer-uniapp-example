@@ -33,6 +33,10 @@ const {
   curText,
   initTextCb,
 } = require("./typable-text/text-cb");
+const {
+  batchRenderCb,
+  initBatchCb
+} = require("./batch/batch-cb");
 Component({
   options: {
     styleIsolation: "shared",
@@ -59,24 +63,27 @@ Component({
       value: "light",
     },
   },
-  observers: {
-    mdText: function (newVal) {
-      if (!this.data.openTyper && newVal) {
-        this.setData({
-          dataNodes: towxml(this.data.mdText.text, "markdown").children,
-        });
-      }
-      // if (this.data.openTyper && newVal && !this.isStarted) {
-      //   this.isStarted = true;
-      //   this.startType();
-      // }
-    },
-  },
+  // observers: {
+  //   mdText: function (newVal) {
+  //     if (!this.data.openTyper && newVal) {
+  //       this.setData({
+  //         dataNodes: towxml(this.data.mdText.text, "markdown").children,
+  //       });
+  //     }
+  //     // if (this.data.openTyper && newVal && !this.isStarted) {
+  //     //   this.isStarted = true;
+  //     //   this.startType();
+  //     // }
+  //   },
+  // },
   lifetimes: {
     ready: function () {
+      console.log("开始打字时间：", new Date())
       console.log("创建了towxml组件实例");
       if (this.data.openTyper && !this.isStarted) {
         initTextCb();
+        // initBatchCb();
+        // this.setData("batchIds",this.data.batchIds)
         this.isStarted = true;
         this.startType();
       }
@@ -85,6 +92,8 @@ Component({
   data: {
     dataNodes: [],
     isStarted: false,
+    batchIds: [0],
+    batchSize: 40
   },
   methods: {
     startType() {
@@ -94,14 +103,14 @@ Component({
       let typerText = "";
       let allText = "";
       let oldFirstLevelChildNodes = [];
-      let timer = undefined;
+      let typerTimer = undefined;
       let testAfterMkSyntaxChar = "";
       let flag = false;
       let tmpUuid = "";
       let index = 0;
       let isNeedFlushIndex = false;
       let lastCurText = "";
-      timer = setInterval(() => {
+      typerTimer = this.customSetInterval(() => {
         if (_this.data.isFinish && c >= _this.data.mdText.text.length) {
           //最后一段文本可能打印不完全，这里善后一下
           const objTree = towxml(allText.substring(finishIndex), "markdown");
@@ -118,8 +127,8 @@ Component({
           this.triggerEvent("finish", {
             message: "打字完毕！",
           });
-
-          clearInterval(timer);
+          console.log("结束打字时间：", new Date())
+          typerTimer.cancel()
           return;
         }
         if (!_this.data.mdText.text || c >= _this.data.mdText.text.length) {
@@ -157,7 +166,17 @@ Component({
         // conda
         // ```
         if (singleChar.match(/\r?\n/g)) {
+          // console.log("换行复用文本长度：", allText.length - finishIndex)
           const objTree = towxml(allText.substring(finishIndex), "markdown");
+          const allNodesSize = objTree.children.length + oldFirstLevelChildNodes.length
+          if (allNodesSize >= _this.data.batchIds.length * _this.data.batchSize) {
+            const _batchId = allNodesSize / _this.data.batchSize
+            _this.data.batchIds[_batchId] = _batchId
+            _this.setData({
+              [`batchIds[${_batchId}]`]:
+                _batchId,
+            })
+          }
           if (!flag) {
             flag = true;
             _this.dataNodes = objTree.children;
@@ -167,10 +186,16 @@ Component({
               _this.dataNodes[oldFirstLevelChildNodes.length + i] =
                 objTree.children[i];
               //通过路径的方式，一个个元素地渲染，比直接_this.setData(dataNodes,数组)的方式，效率提高很多
-              _this.setData({
-                [`dataNodes[${oldFirstLevelChildNodes.length + i}]`]:
-                  objTree.children[i],
-              });
+
+              (function renderNodeWhenEnter() {
+                const batchNum = Math.trunc((oldFirstLevelChildNodes.length + i) / _this.data.batchSize)
+                const renderIndex = (oldFirstLevelChildNodes.length + i) % _this.data.batchSize
+                batchRenderCb.value[batchNum](renderIndex, objTree.children[i])
+                // _this.setData({
+                //   [`dataNodes[${oldFirstLevelChildNodes.length + i}]`]:
+                //     objTree.children[i],
+                // });
+              })()
             }
             //上一次可能渲染了多余的节点，这次要去掉
             for (
@@ -178,7 +203,12 @@ Component({
               x < _this.dataNodes.length;
               x++
             ) {
-              _this.setData({ [`dataNodes[${x}]`]: { tag: "unknow" } });
+              (function renderUnknowNodeWhenEnter() {
+                const batchNum = Math.trunc(x / _this.data.batchSize)
+                const renderIndex = x % _this.data.batchSize
+                batchRenderCb.value[batchNum](renderIndex, { tag: "unknow" })
+                // _this.setData({ [`dataNodes[${x}]`]: { tag: "unknow" } });
+              })()
             }
           }
         }
@@ -191,6 +221,16 @@ Component({
             tmpUuid = textInstaceUuid.value;
             lastCurText = curText.value;
             const objTree = towxml(allText.substring(finishIndex), "markdown");
+            const allNodesSize = objTree.children.length + oldFirstLevelChildNodes.length
+            if (allNodesSize >= _this.data.batchIds.length * _this.data.batchSize) {
+              const _batchId = allNodesSize / _this.data.batchSize
+              _this.data.batchIds[_batchId] = _batchId
+              _this.setData({
+                [`batchIds[${_batchId}]`]:
+                  _batchId,
+              })
+            }
+            // console.log("未复用文本长度：", allText.length - finishIndex)
             // console.log("当前finishIndex: ", finishIndex);
             // console.log("当前字符串：\n", allText.substring(finishIndex));
             // console.log("渲染对应的第一个字符：", singleChar);
@@ -204,10 +244,15 @@ Component({
                 _this.dataNodes[oldFirstLevelChildNodes.length + i] =
                   objTree.children[i];
                 //通过路径的方式，一个个元素地渲染，比直接_this.setData(dataNodes,数组)的方式，效率提高很多
-                _this.setData({
-                  [`dataNodes[${oldFirstLevelChildNodes.length + i}]`]:
-                    objTree.children[i],
-                });
+                (function renderNode() {
+                  const batchNum = Math.trunc((oldFirstLevelChildNodes.length + i) / _this.data.batchSize)
+                  const renderIndex = (oldFirstLevelChildNodes.length + i) % _this.data.batchSize
+                  batchRenderCb.value[batchNum](renderIndex, objTree.children[i])
+                  // _this.setData({
+                  //   [`dataNodes[${oldFirstLevelChildNodes.length + i}]`]:
+                  //     objTree.children[i],
+                  // });
+                })()
               }
               //上一次可能渲染了多余的节点，这次要去掉
               for (
@@ -216,7 +261,12 @@ Component({
                 x < _this.dataNodes.length;
                 x++
               ) {
-                _this.setData({ [`dataNodes[${x}]`]: { tag: "unknow" } });
+                (function renderUnknowNode() {
+                  const batchNum = Math.trunc(x / _this.data.batchSize)
+                  const renderIndex = x % _this.data.batchSize
+                  batchRenderCb.value[batchNum](renderIndex, { tag: "unknow" })
+                  // _this.setData({ [`dataNodes[${x}]`]: { tag: "unknow" } });
+                })()
               }
             }
             //以下是判断是否可以复用的逻辑，复用的条件就是：当最新的内容转化出来有n个节点，那么只有第n个是可能不完整的，前n-1个是可以复用的
@@ -296,7 +346,7 @@ Component({
             }
           }
         }
-      }, _this.data.speed);
+      }, _this.data.speed)
     },
     isMkSyntaxChar(c1, c2) {
       const ar1 = [" ", "+", ":", "(", "-"];
@@ -361,5 +411,36 @@ Component({
       }
       return unescapedText;
     },
+    //通过setTimeout自定义setInterval,因为如果使用js的setInterval,每次回调的时候可能大于设置的间隔时间，导致报警告：[Violation] 'setInterval' handler took 50ms
+    customSetInterval(callback, delay) {
+      let timer = null;
+      let isRunning = true;
+      const run = () => {
+        if (!isRunning) return;
+        const start = Date.now();
+        try {
+          callback();
+        } catch (error) {
+          console.error('回调函数执行出错:', error);
+        }
+        const end = Date.now();
+        const actualTime = end - start;
+        const nextDelay = actualTime < delay ? delay - actualTime : 0;
+        if (timer !== null) {
+          clearTimeout(timer);
+        }
+        timer = setTimeout(run, nextDelay);
+      };
+      run();
+      return {
+        cancel: () => {
+          if (timer !== null && isRunning) {
+            clearTimeout(timer);
+            timer = null;
+            isRunning = false;
+          }
+        }
+      };
+    }
   },
 });

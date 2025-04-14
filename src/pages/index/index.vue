@@ -1,34 +1,18 @@
 <template>
   <view class="page">
-    <scroll-view
-      class="page-scroll"
-      scroll-y
-      :scroll-with-animation="true"
-      :scroll-into-view="scrollIntoViewId"
-      scroll-style="none"
-    >
+    <scroll-view class="page-scroll" scroll-y :scroll-with-animation="true" :scroll-into-view="scrollIntoViewId"
+      scroll-style="none">
       <view class="scroll-container">
         <view :class="['item']">
           <view class="answer-item">
-            <towxml
-              :mdText="mdText"
-              :speed="speed"
-              :isFinish="isFinish"
-              @finish="finish"
-              v-if="isShow"
-            />
+            <towxml :mdText="mdText" :speed="speed" :isFinish="isFinish" @finish="finish" v-if="isShow" />
           </view>
         </view>
         <view class="anchor" id="scroll-anchor"></view>
       </view>
     </scroll-view>
     <view class="input-container">
-      <input
-        class="input"
-        placeholder="请输入markdown文本地址"
-        @confirm="sendQuestion"
-        v-model="inputText"
-      />
+      <input class="input" placeholder="请输入markdown文本地址" @confirm="sendQuestion" v-model="inputText" />
     </view>
   </view>
 </template>
@@ -85,9 +69,10 @@ export default {
       timer = setInterval(() => {
         if (scroller % 100 == 0) {
           scrollIntoViewId.value = "";
-          setTimeout(() => {
+          function scrollRender() {
             scrollIntoViewId.value = "scroll-anchor";
-          }, 0);
+          }
+          setTimeout(scrollRender, 0);
         }
         scroller++;
         if (c >= content.length) {
