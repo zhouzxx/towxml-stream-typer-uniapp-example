@@ -63,31 +63,24 @@ Component({
       value: "light",
     },
   },
-  // observers: {
-  //   mdText: function (newVal) {
-  //     if (!this.data.openTyper && newVal) {
-  //       this.setData({
-  //         dataNodes: towxml(this.data.mdText.text, "markdown").children,
-  //       });
-  //     }
-  //     // if (this.data.openTyper && newVal && !this.isStarted) {
-  //     //   this.isStarted = true;
-  //     //   this.startType();
-  //     // }
-  //   },
-  // },
   lifetimes: {
+    created: function () {
+      initTextCb();
+      initBatchCb();
+    },
     ready: function () {
       console.log("开始打字时间：", new Date())
       console.log("创建了towxml组件实例");
       if (this.data.openTyper && !this.isStarted) {
-        initTextCb();
-        // initBatchCb();
-        // this.setData("batchIds",this.data.batchIds)
         this.isStarted = true;
         this.startType();
       }
-    },
+      if (!this.data.openTyper) {
+        this.setData({
+          dataNodes: towxml(this.data.mdText.text, "markdown").children,
+        });
+      }
+    }
   },
   data: {
     dataNodes: [],
