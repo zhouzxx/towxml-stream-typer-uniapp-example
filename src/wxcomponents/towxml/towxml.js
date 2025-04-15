@@ -104,6 +104,10 @@ Component({
       let isNeedFlushIndex = false;
       let lastCurText = "";
       typerTimer = this.customSetInterval(() => {
+        if (batchRenderCb.value[_this.data.batchIds[_this.data.batchIds.length - 1]] == undefined) {
+          // console.log(`空转一下，等待batch组件实例${_this.data.batchIds[_this.data.batchIds.length - 1]}创建好`)
+          return
+        }
         if (_this.data.isFinish && c >= _this.data.mdText.text.length) {
           //最后一段文本可能打印不完全，这里善后一下
           const objTree = towxml(allText.substring(finishIndex), "markdown");
