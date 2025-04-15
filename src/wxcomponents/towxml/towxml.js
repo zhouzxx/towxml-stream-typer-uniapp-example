@@ -85,7 +85,7 @@ Component({
   data: {
     dataNodes: [],
     isStarted: false,
-    batchIds: [0],
+    batchIds: [0, 1],//先提前创建两个分批组件,方便后面进行隔代创建
     batchSize: 40
   },
   methods: {
@@ -162,8 +162,9 @@ Component({
           // console.log("换行复用文本长度：", allText.length - finishIndex)
           const objTree = towxml(allText.substring(finishIndex), "markdown");
           const allNodesSize = objTree.children.length + oldFirstLevelChildNodes.length
-          if (allNodesSize >= _this.data.batchIds.length * _this.data.batchSize) {
-            const _batchId = allNodesSize / _this.data.batchSize
+          if (allNodesSize >= (_this.data.batchIds.length - 1) * _this.data.batchSize) {
+            //当第n个批组件用完了，就创建n+2个批组件，隔代创建，防止batchRenderCb.value[batchNum]为undifined
+            const _batchId = Math.trunc(allNodesSize / _this.data.batchSize) + 1
             _this.data.batchIds[_batchId] = _batchId
             _this.setData({
               [`batchIds[${_batchId}]`]:
@@ -215,8 +216,9 @@ Component({
             lastCurText = curText.value;
             const objTree = towxml(allText.substring(finishIndex), "markdown");
             const allNodesSize = objTree.children.length + oldFirstLevelChildNodes.length
-            if (allNodesSize >= _this.data.batchIds.length * _this.data.batchSize) {
-              const _batchId = allNodesSize / _this.data.batchSize
+            if (allNodesSize >= (_this.data.batchIds.length - 1) * _this.data.batchSize) {
+              //当第n个批组件用完了，就创建n+2个批组件，隔代创建，防止batchRenderCb.value[batchNum]为undifined
+              const _batchId = Math.trunc(allNodesSize / _this.data.batchSize) + 1
               _this.data.batchIds[_batchId] = _batchId
               _this.setData({
                 [`batchIds[${_batchId}]`]:
