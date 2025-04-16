@@ -77,7 +77,7 @@ Component({
       }
       if (!this.data.openTyper) {
         this.setData({
-          dataNodes: towxml(this.data.mdText.text, "markdown").children,
+          dataNodes: towxml(this.data.mdText.text, "markdown"),
         });
       }
     }
