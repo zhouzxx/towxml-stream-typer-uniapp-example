@@ -1,11 +1,7 @@
 <template>
   <view v-for="msgItem in messages" :key="msgItem.id" class="item">
-    <view
-      v-if="msgItem.type == answerType"
-      class="answer-item"
-      :data-towxmlid="msgItem.id"
-    >
-      <towxml :towxmlId="msgItem.id" :speed="speed" @finish="finish" />
+    <view v-if="msgItem.type == answerType" class="answer-item" :data-towxmlid="msgItem.id">
+      <towxml :towxmlId="msgItem.id" :speed="speed" @finish="finish" @historyMessageFinish="historyMessageFinish" :openTyper="!msgItem.isHistoryMessage"/>
     </view>
     <view v-if="msgItem.type == questionType" class="question">
       <view class="question-item">{{ msgItem.content }}</view>
@@ -25,13 +21,16 @@ const {
 } = require("../../wxcomponents/towxml/globalCb");
 export default {
   props: ["messages"],
-  emits: ["finish"],
+  emits: ["finish","historyMessageFinish"],
   setup(props, { emit }) {
     const questionType = 0; //问题
     const answerType = 1; //答案
-    const speed = 10;
+    const speed = 8;
     function finish(e) {
       emit("finish", e);
+    }
+    function historyMessageFinish(e) {
+      emit("historyMessageFinish", e);
     }
     //为什么要麻烦你导入setQueryTowxmlNodeFn函数，并进行赋值，因为我为了节约内存，做虚拟显示，即只加载当前屏幕上下几屏的内容，必须要获得每一个towxml的top位置，同时为了性能和其他方面的考虑，我需要一次性获取所有towxml组件的top位置
     //由于微信小程序的限制，createSelectorQuery只能查询到当前组件内的dom标签，不能查询父组件中或者页面上的标签，我无法在一个towmxl组件实例中获取其他towmxl实例对应的位置，所以不得不需要你的帮助
@@ -54,6 +53,7 @@ export default {
       answerType,
       speed,
       finish,
+      historyMessageFinish
     };
   },
 };
