@@ -2,11 +2,10 @@
   <view class="page">
     <scroll-view class="chat-scroll" scroll-y :scroll-with-animation="true" scroll-style="none" @scroll="onScroll"
       @touchstart="onTouchStart" :scroll-into-view="scrollIntoViewId">
-      <view class="chat-body">
-        <Chat :messages="messages" @finish="finish" @historyMessageFinish="historyMessageFinish"
-          v-show="historyMessageLoaded" />
-        <view class="anchor" id="scroll-anchor"></view>
+      <view class="chat-body" :style="{ visibility: historyMessageLoaded ? 'visible' : 'hidden' }">
+        <Chat :messages="messages" @finish="finish" @historyMessageFinish="historyMessageFinish" />
       </view>
+      <view class="anchor" id="scroll-anchor"></view>
     </scroll-view>
     <view class="input-container">
       <input class="input" placeholder="请输入markdown文本url地址" @confirm="sendQuestion" v-model="inputText" />
@@ -145,14 +144,18 @@ export default {
       isTyping.value = false;
     }
 
-    //每当一条历史消息渲染完毕，就会回调这个函数，当所有的历史消息都渲染完毕，将v-show设为true
+    //每当一条历史消息渲染完毕，就会回调这个函数，当所有的历史消息都渲染完毕，将visibility设为visible
     function historyMessageFinish(e) {
       finishedHistoryMessageNum++
       //渲染的历史消息数量大于等于历史消息总数，说明全部渲染完毕
       if (finishedHistoryMessageNum >= historyMessageNum) {
-        historyMessageLoaded.value = true;
-        uni.hideLoading();
         scrollToBottom();
+        //因为滚动到底部需要一点时间，所以800毫秒之后再设置可见
+        const timer = setTimeout(() => {
+          uni.hideLoading();
+          historyMessageLoaded.value = true;
+          clearTimeout(timer)
+        }, 800)
       }
       console.log("收到一条历史消息渲染完毕的回调")
     }
@@ -217,8 +220,8 @@ export default {
               url: `http://110.41.9.23/static/video-embed.md`,
               encoding: "utf-8",
               success: async (res) => {
-                //构造50条历史消息
-                for (let i = 1; i <= 50; i++) {
+                //构造30条历史消息
+                for (let i = 1; i <= 30; i++) {
                   const curId = new Date().getTime();
                   messages.value.push({
                     id: curId,
