@@ -217,7 +217,7 @@ export default {
             finishedHistoryMessageNum = 0
             historyMessageNum = 0
             uni.request({
-              url: `http://110.41.9.23/static/video-embed.md`,
+              url: `http://47.119.142.242/static/video-embed.md`,
               encoding: "utf-8",
               success: async (res) => {
                 //构造30条历史消息
